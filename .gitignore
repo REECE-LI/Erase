@@ -1,0 +1,14 @@
+.DS_Store
+binary_output.jpg
+.idea/.gitignore
+.idea/Erase.iml
+.idea/GitCommitMessageStorage.xml
+.idea/misc.xml
+.idea/modules.xml
+.idea/vcs.xml
+.idea/inspectionProfiles/profiles_settings.xml
+__pycache__/config.cpython-311.pyc
+__pycache__/erase.cpython-311.pyc
+__pycache__/gcode_utils.cpython-311.pyc
+__pycache__/udp_utils.cpython-311.pyc
+gcode/.DS_Store
