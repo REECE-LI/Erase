@@ -12,3 +12,4 @@ __pycache__/erase.cpython-311.pyc
 __pycache__/gcode_utils.cpython-311.pyc
 __pycache__/udp_utils.cpython-311.pyc
 gcode/.DS_Store
+.idea/inspectionProfiles/Project_Default.xml
