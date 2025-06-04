@@ -55,6 +55,3 @@ if __name__ == '__main__':
     t3.join()
     print("main end")
     udp.close()
-
-
-## t2
