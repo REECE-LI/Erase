@@ -4,7 +4,7 @@ import threading
 from evdev import InputDevice, ecodes
 
 # ============ 设置区域 ============
-device_path = '/dev/input/event14'  # ← 替换为实际的设备路径
+device_path = '/dev/input/event13'  # ← 替换为实际的设备路径
 udp_ip = '192.168.50.17'           # ← 目标IP
 udp_port = 11222                   # ← 目标端口
 send_interval = 0.03               # 20ms
