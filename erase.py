@@ -15,18 +15,19 @@ import config
 
 import udp_utils
 
-# port = 'COM22'
+port = 'COM22'
 baud_rate = 115200
 
 # ser = serial.Serial(port, baud_rate)
 
-cap = cv2.VideoCapture(6)  # , cv2.CAP_DSHOW # Use cv2.CAP_DSHOW to avoid camera initialization issues on Windows
-
+# cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+cap = cv2.VideoCapture(4)
+# set 240 fps
+cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, 3840) #640
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 2160) #400
 cap.set(cv2.CAP_PROP_FPS, 30)
 
-cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
-cap.set(cv2.CAP_PROP_FRAME_WIDTH, 3840)  # 640
-cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 2160)  # 400
 
 
 def find_third_vertex(x1, y1, x2, y2, a, b, c):
@@ -59,11 +60,8 @@ def intMap(value, fromLow, fromHigh, toLow, toHigh):
     return (value - fromLow) * (toHigh - toLow) / (fromHigh - fromLow) + toLow
 
 
-def detect(udp):
-    error_flag = False
 
-    # 圆心轨迹
-    circle_center = []
+def detect(udp):
 
     lasttime = time.time()
     fps = 0
@@ -85,16 +83,14 @@ def detect(udp):
             lasttime = now
             frame_num = 0
 
+        frame = cv2.resize(frame, ((int)(960), (int)(540)), interpolation=cv2.INTER_LINEAR)
         # cv2.imshow("frame", frame)
 
         blank = np.zeros_like(frame)
-        #
-        # height, width, channels = frame.shape
-        # print("图像的高度（长）为:", height)
-        # print("图像的宽度为:", width)
+
         # 二值化
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        ret, binary = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY)
+        ret, binary = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY)
 
         # 检测边缘
         edges = cv2.Canny(binary, 100, 200)
@@ -105,15 +101,24 @@ def detect(udp):
         contours = sorted(contours, key=cv2.contourArea, reverse=True)
         if len(contours) == 0:
             error_flag = True
+            print("No contours found")
             continue
         # cv2.drawContours(blank, contours, -1, (255, 255, 255), 1)
         # cv2.imshow("blank", blank)
         #
+
+        for contour in contours:
+            print("Contour area:", cv2.contourArea(contour))
+
         # 去除小轮廓
-        contours = [contour for contour in contours if cv2.contourArea(contour) > 20]
+        contours = [contour for contour in contours if cv2.contourArea(contour) > 10]
         if len(contours) == 0:
             error_flag = True
+            print("No contours found after filtering")
             continue
+        else:
+            for contour in contours:
+                print("Contour area:", cv2.contourArea(contour))
 
         cv2.drawContours(blank, contours, -1, (255, 255, 255), 1)
         # cv2.imshow("blank", blank)
@@ -128,10 +133,11 @@ def detect(udp):
         continue_flag = False
 
         for coutour in contours:
-            if len(coutour) < 5:
+            if len(coutour)<5:
                 continue_flag = True
 
         if continue_flag:
+            print("Some contours are too small, skipping...")
             continue
 
         for coutour in contours:
@@ -144,7 +150,7 @@ def detect(udp):
             markers.append(marker)
             cv2.circle(frame, center, 1, (0, 255, 0), -1)
 
-        # print(markers)
+        print(markers)
 
         # 去重
         for i in range(len(markers)):
@@ -152,12 +158,14 @@ def detect(udp):
                 if markers[i] is not None and markers[j] is not None:
                     if abs(markers[i][0][0] - markers[j][0][0]) < 2 and abs(markers[i][0][1] - markers[j][0][1]) < 2:
                         markers[i] = None
-        # print(markers)
+        print(markers)
 
         markers = [marker for marker in markers if marker is not None]
 
         if len(markers) != 3:
             error_flag = True
+            print("Not enough markers found, expected 3 but got", len(markers))
+            # print markers's area
             continue
 
         dist = []
@@ -216,8 +224,6 @@ def detect(udp):
             int((max_markers[0][0][1] + max_markers[1][0][1]) / 2))
         angle = (np.arctan2(max_markers[1][0][1] - max_markers[0][0][1],
                             max_markers[1][0][0] - max_markers[0][0][0]) * 180 / np.pi) + 180
-        # print("center: ", center, int(angle*10))
-        # print("angle: ", angle)
 
         # draw line
         cv2.line(frame, max_markers[0][0], max_markers[1][0], (0, 255, 0), 2)
@@ -225,7 +231,7 @@ def detect(udp):
         # draw angle
         cv2.putText(frame, "angle: %.2f" % angle, (center[0] + 20, center[1] + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
                     (0, 0, 255), 1)
-        cv2.putText(frame, "center: (%d, %d)" % (center[0] * 1.28, center[1] * 1.28), (center[0] + 20, center[1] + 40),
+        cv2.putText(frame, "center: (%d, %d)" % (center[0]*1.28, center[1]*1.28), (center[0] + 20, center[1] + 40),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
         # draw center
         cv2.circle(frame, center, 6, (0, 0, 255), -1)
@@ -234,50 +240,6 @@ def detect(udp):
         cv2.putText(frame, "B", max_markers[1][0], cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
         cv2.putText(frame, "C", min_marker[0], cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
 
-        # # 仿射变换开始
-        # ab = np.sqrt((max_markers[0][0][0] - max_markers[1][0][0])**2 + (max_markers[0][0][1] - max_markers[1][0][1])**2)
-        # ac = np.sqrt((max_markers[0][0][0] - min_marker[0][0])**2 + (max_markers[0][0][1] - min_marker[0][1])**2)
-        # bc = np.sqrt((max_markers[1][0][0] - min_marker[0][0])**2 + (max_markers[1][0][1] - min_marker[0][1])**2)
-        #
-        # #          ab ac bc
-        # dist_gt = [0, 1, 0.8]
-        # dist_gt[0] = np.sqrt((dist_gt[1])**2 + (dist_gt[2])**2)
-        # ab_gt = ab
-        # bc_gt = ab * (dist_gt[2] / dist_gt[0])
-        # ac_gt = ab * (dist_gt[1] / dist_gt[0])
-        #
-        # min_marker_gt = find_third_vertex(max_markers[0][0][0], max_markers[0][0][1], max_markers[1][0][0], max_markers[1][0][1], bc_gt, ac_gt, ab_gt)
-        #
-        # cv2.circle(frame, np.array(min_marker_gt[0], dtype=int), 1, (0, 255, 0), -1)
-        # cv2.circle(frame, np.array(min_marker_gt[1], dtype=int), 1, (0, 255, 0), -1)
-        #
-        # min_marker_gt_1_dist = abs(min_marker_gt[0][0] - min_marker[0][0]) + abs(min_marker_gt[0][1] - min_marker[0][1])
-        # min_marker_gt_2_dist = abs(min_marker_gt[1][0] - min_marker[0][0]) + abs(min_marker_gt[1][1] - min_marker[0][1])
-        #
-        # if min_marker_gt_1_dist < min_marker_gt_2_dist:
-        #     min_marker_gt = min_marker_gt[0]
-        # else:
-        #     min_marker_gt = min_marker_gt[1]
-        #
-        # # 仿射变换
-        # # 3个点
-        # pts1 = np.float32([max_markers[0][0], max_markers[1][0], min_marker[0]])
-        # pts2 = np.float32([max_markers[0][0], max_markers[1][0], min_marker_gt])
-        # M = cv2.getAffineTransform(pts1, pts2)
-        # dst = cv2.warpAffine(frame, M, (frame.shape[1], frame.shape[0]))
-        # cv2.imshow("dst", dst)
-
-        # # 保存圆心轨迹
-        # circle_center.append(center)
-        # circle_center = circle_center[-200:]
-        #
-        # # 显示轨迹
-        # for i in range(1, len(circle_center)):
-        #     cv2.line(frame, circle_center[i - 1], circle_center[i], (255, 255, 0), 2)
-        #
-        # cv2.circle(blank, center, int(radius*0.8), (255, 255, 255), 1)
-        # cv2.imshow("blank", blank)
-        # # 仿射变换结束
 
         # 发送数据
         data = {
@@ -288,46 +250,25 @@ def detect(udp):
             }
         }
 
-        # 发送数据
-        data2 = {
-            "data": {
-                "x": center[0]* 1.28,
-                "y": center[1] * 1.28,
-                "angle": round(angle, 2)
-            }
-        }
-
-        # 打印结果
-        print(f"x: {int(data2['data']['x'])}, y: {int(data2['data']['y'])}, angle: {int(data2['data']['angle'])}")
-
-
         data = json.dumps(data).encode('utf-8')
-        # print("data: ", data)
 
         # send data
         udp.send(data)
         # ser.write(data)
         # show fps
-        # cv2.putText(frame, "fps: %.2f" % fps, (10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
+        cv2.putText(frame, "fps: %.2f" % fps, (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 255), 2)
         # cv2.putText(frame, "center: (%f, %f)" % (center[0]/frame.shape[1], center[1]/frame.shape[0]), (10, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
 
         # 显示二值化图像
-        # cv2.namedWindow('binary Window', cv2.WINDOW_NORMAL)
-        # cv2.imshow("binary Window", binary)
+        cv2.namedWindow('binary Window', cv2.WINDOW_NORMAL)
+        cv2.imshow("binary Window", binary)
         # 显示帧
         cv2.namedWindow('frame Window', cv2.WINDOW_NORMAL)
         cv2.imshow("frame Window", frame)
 
-        # send
-
-        # # 按 'q' 键退出
-        # if cv2.waitKey(1) & 0xFF == ord('q'):
-        #     break
-
     cap.release()
     cv2.destroyAllWindows()
 
-
 if __name__ == '__main__':
-    udp = udp_utils.UdpClass(('127.0.0.1', 16667), config.esp_address)
+    udp = udp_utils.UdpClass(('127.0.0.1', 16667),config.esp_address)
     detect(udp)
