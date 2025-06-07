@@ -20,13 +20,15 @@ baud_rate = 115200
 
 # ser = serial.Serial(port, baud_rate)
 
-# cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
-cap = cv2.VideoCapture(4)
+cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+# cap = cv2.VideoCapture(4)
 # set 240 fps
+
+cap.set(cv2.CAP_PROP_FPS, 240)
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640) #640
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480) #400
 cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
-cap.set(cv2.CAP_PROP_FRAME_WIDTH, 3840) #640
-cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 2160) #400
-cap.set(cv2.CAP_PROP_FPS, 30)
+
 
 
 
@@ -260,8 +262,8 @@ def detect(udp):
         # cv2.putText(frame, "center: (%f, %f)" % (center[0]/frame.shape[1], center[1]/frame.shape[0]), (10, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
 
         # 显示二值化图像
-        cv2.namedWindow('binary Window', cv2.WINDOW_NORMAL)
-        cv2.imshow("binary Window", binary)
+        # cv2.namedWindow('binary Window', cv2.WINDOW_NORMAL)
+        # cv2.imshow("binary Window", binary)
         # 显示帧
         cv2.namedWindow('frame Window', cv2.WINDOW_NORMAL)
         cv2.imshow("frame Window", frame)

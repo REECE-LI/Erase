@@ -4,49 +4,58 @@ import threading
 import json
 import numpy as np
 import cv2
-from evdev import InputDevice, ecodes
+import pygame
 
 # === 参数设置 ===
-device_path = '/dev/input/event13'
 udp_target = ('192.168.50.17', 11222)
-video_index = 4
-
+video_index = 0
 send_interval = 0.03  # 30ms
 
 # === 全局共享数据 ===
-joystick_data = {"x": 0, "y": 0, "z": 0}
+joystick_data = {"x": 0, "y": 0, "j": 0, "k": 0}
 vision_data = {"x": 0, "y": 0, "angle": 0.0}
-
 data_lock = threading.Lock()
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
+
 # === 手柄线程 ===
 def joystick_thread():
-    gamepad = InputDevice(device_path)
-    axis_map = {
-        ecodes.ABS_X: 0,
-        ecodes.ABS_Y: 1,
-        ecodes.ABS_RX: 3,
-    }
+    pygame.init()
+    pygame.joystick.init()
+
+    if pygame.joystick.get_count() == 0:
+        print("没有检测到手柄")
+        return
+
+    joystick = pygame.joystick.Joystick(0)
+    joystick.init()
+    print(f"检测到手柄: {joystick.get_name()}")
+
     while True:
-        for event in gamepad.read_loop():
-            if event.type == ecodes.EV_ABS and event.code in axis_map:
-                with data_lock:
-                    axis_id = axis_map[event.code]
-                    if axis_id == 0:
-                        joystick_data["x"] = event.value
-                    elif axis_id == 1:
-                        joystick_data["y"] = event.value
-                    elif axis_id == 3:
-                        joystick_data["z"] = event.value
+        pygame.event.pump()  # 必须调用来更新 joystick 状态
+
+        with data_lock:
+            # 假设：
+            # 轴 0 = 左摇杆 X，对应 joystick_data["x"]
+            # 轴 1 = 左摇杆 Y，对应 joystick_data["y"]
+            # 轴 3 = 右摇杆 X 或扳机，对应 joystick_data["z"]
+            joystick_data["x"] = (int)(joystick.get_axis(0) * 110)
+            joystick_data["y"] = (int)(joystick.get_axis(1) * 110)
+            joystick_data["j"] = (int)(joystick.get_axis(4) + 1)
+            joystick_data["k"] = (int)(joystick.get_axis(5) + 1)
+        # # 输出当前手柄状态
+        # print(f"手柄状态: {joystick_data}")
+        time.sleep(0.01)  # 防止占用过高 CPU
+
 
 # === 图像识别线程 ===
 def vision_thread():
-    cap = cv2.VideoCapture(video_index)
-    cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
+    cap = cv2.VideoCapture(video_index, cv2.CAP_DSHOW)
+
     cap.set(cv2.CAP_PROP_FPS, 30)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 3840)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 2160)
+    cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
 
     lasttime = time.time()
     fps = 0
@@ -129,16 +138,9 @@ def vision_thread():
 
         angle = (np.arctan2(max2[0][1] - max1[0][1], max2[0][0] - max1[0][0]) * 180 / np.pi + 180) % 360
 
-        # 可视化
-        # for (pt, r) in unique_markers:
-        #     cv2.circle(frame, pt, r, (0, 255, 0), 2)
-        # cv2.line(frame, max1[0], max2[0], (255, 0, 0), 2)
-        # cv2.circle(frame, center, 6, (0, 0, 255), -1)
-        # cv2.putText(frame, f"angle: {angle:.2f}", (center[0]+20, center[1]+20), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
-        #
-        # # camera show
-        # cv2.putText(frame, f"FPS: {fps:.2f}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-        # cv2.imshow("Camera", frame)
+        # 显示帧
+        cv2.namedWindow('frame Window', cv2.WINDOW_NORMAL)
+        cv2.imshow("frame Window", frame)
 
         with data_lock:
             vision_data["x"] = center[0]
@@ -156,8 +158,9 @@ def udp_sender():
             }
         msg = json.dumps(packet)
         sock.sendto(msg.encode(), udp_target)
-        print("Sent:", msg)
+        print(f"发送数据: {msg}")
         time.sleep(send_interval)
+
 
 # === 启动线程 ===
 threading.Thread(target=joystick_thread, daemon=True).start()

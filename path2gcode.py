@@ -219,37 +219,18 @@ class Slicer:
         # gcode.append(self.writer.motor_disable())
         gcode.append(self.writer.move_to(0, 0))
         return gcode, text_list
-    # def slice_char(self, char):
-    #     paths = self.font[str(char)]
-    #     for path in paths:
-    #         self.writer.set_speed(1000)
-    #         gcode.append(self.writer.write_down())
-    #         for node in path:
-    #             x = node[0] * self.width
-    #             y = node[1] * self.width
-    #             gcode.append(self.writer.move_to(x, y))
-    #         gcode.append(self.writer.write_up())
-    #         print(gcode)
-    #         path = np.array(path)
-    #         # print(line)
-    #         # draw line [[0.0, 0.77], [1.0, 0.77]] [[x1, y1], [x2, y2]]
-    #         x = path[:, 0]
-    #         y = path[:, 1]
-    #         plt.plot(x, y)
-    #     #     print char on plt
-    #     plt.text(0.5, 0.5, char, fontsize=20)
-    #     plt.show()
+
 
 
 if __name__ == '__main__':
     s = Slicer(Writer(0x7523, 0x1a86))
     s.set_font('AlibabaHealthFont20CN-45R.json')#FZSJ-MLXQTJW  AlibabaHealthFont20CN-45R
-    s.set_text("会")#出分,AI监控评分
+    s.set_text("播")#出分,AI监控评分
     s.set_width(50)
     s.set_gap(1)#1.1
     s.set_global_location([0, -20])
     output, _ = s.slice()
     print(output)
     # save to txt
-    with open("gcode/output_hui.gcode", "w") as f:
+    with open("gcode/hanzi-jian.gcode", "w") as f:
         f.writelines(output)

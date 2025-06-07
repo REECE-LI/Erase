@@ -12,7 +12,7 @@ import config
 
 import serial
 
-port = '/dev/tty.usbmodem1301'
+port = 'COM22'
 baud_rate = 115200
 
 ser = serial.Serial(port, baud_rate, timeout=0.001)
@@ -37,8 +37,8 @@ def send2serial():
             ser.write(buffer[0])
             # print(buffer[0])
         ser_buffer = ser.readall()
-        # if ser_buffer != b'':
-        #     udp_local.send(str(int(ser_buffer)).encode())
+        if ser_buffer != b'':
+            udp_local.send(str(int(ser_buffer)).encode())
         # if ser_buffer is
 
 
@@ -48,10 +48,10 @@ if __name__ == '__main__':
     t2 = threading.Thread(target=gcode_thread)
     t3 = threading.Thread(target=send2serial)
     t1.start()
-    # t2.start()
+    t2.start()
     t3.start()
     t1.join()
-    # t2.join()
+    t2.join()
     t3.join()
     print("main end")
     udp.close()
