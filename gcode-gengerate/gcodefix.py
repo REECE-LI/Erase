@@ -139,8 +139,8 @@ def save_gcode(coords, file_path):
 
 # === 主程序 ===
 if __name__ == '__main__':
-    gcode_path = './gcode/hanzi-jian.gcode'
-    save_path = './gcode/hanzi-jian-edited.gcode'
+    gcode_path = '../gcode/hanzi-jian.gcode'
+    save_path = '../gcode/hanzi-jian-edited.gcode'
 
     with open(gcode_path, 'r') as f:
         gcode_text = f.read()

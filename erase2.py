@@ -1,26 +1,34 @@
-import socket
+import struct
 import time
-import threading
-import json
-import numpy as np
 import cv2
-import pygame
+import os
+import numpy as np
+
+import serial
+import socket
+import sympy as sp
+import json
+import re
+import time
+
+import config
+
+import udp_utils
 import math
 
-# === 参数设置 ===
-# 小黄
-# udp_target = ('192.168.50.17', 11222)
-# 小绿
-udp_target = ('192.168.50.166', 11222)
-video_index = 0
-send_interval = 0.03  # 30ms
+port = 'COM22'
+baud_rate = 115200
 
-# === 全局共享数据 ===
-joystick_data = {"x": 0, "y": 0, "j": 0, "k": 0}
-vision_data = {"x": 0, "y": 0, "angle": 0.0}
-data_lock = threading.Lock()
-sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+# ser = serial.Serial(port, baud_rate)
 
+cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+# cap = cv2.VideoCapture(4)
+# set 240 fps
+
+cap.set(cv2.CAP_PROP_FPS, 240)
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640) #640
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480) #400
+cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
 
 def signed_angle(p1, p2):
     """
@@ -37,45 +45,7 @@ def midpoint(p1, p2):
     return ((p1[0] + p2[0]) // 2, (p1[1] + p2[1]) // 2)
 
 
-# === 手柄线程 ===
-def joystick_thread():
-    pygame.init()
-    pygame.joystick.init()
-
-    if pygame.joystick.get_count() == 0:
-        print("没有检测到手柄")
-        return
-
-    joystick = pygame.joystick.Joystick(0)
-    joystick.init()
-    print(f"检测到手柄: {joystick.get_name()}")
-
-    while True:
-        pygame.event.pump()  # 必须调用来更新 joystick 状态
-
-        with data_lock:
-            # 假设：
-            # 轴 0 = 左摇杆 X，对应 joystick_data["x"]
-            # 轴 1 = 左摇杆 Y，对应 joystick_data["y"]
-            # 轴 3 = 右摇杆 X 或扳机，对应 joystick_data["z"]
-            joystick_data["x"] = (int)(joystick.get_axis(0) * 110)
-            joystick_data["y"] = (int)(joystick.get_axis(1) * 110)
-            joystick_data["j"] = (int)(joystick.get_axis(4) + 1)
-            joystick_data["k"] = (int)(joystick.get_axis(5) + 1)
-        # # 输出当前手柄状态
-        # print(f"手柄状态: {joystick_data}")
-        time.sleep(0.01)  # 防止占用过高 CPU
-
-
-# === 图像识别线程 ===
-def vision_thread():
-    cap = cv2.VideoCapture(video_index, cv2.CAP_DSHOW)
-
-    cap.set(cv2.CAP_PROP_FPS, 240)
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-    cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
-
+def detect(udp):
     lasttime = time.time()
     fps = 0
     frame_num = 0
@@ -107,7 +77,7 @@ def vision_thread():
 
         binary = cv2.bitwise_not(binary)
         # 膨胀 + 腐蚀
-        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5,5))
         binary = cv2.dilate(binary, kernel, iterations=1)
         binary = cv2.bitwise_not(binary)
         binary = cv2.dilate(binary, kernel, iterations=1)
@@ -168,6 +138,7 @@ def vision_thread():
 
                 # === 交换 1号 和 2号顺序 ===
 
+
                 # === 可选：叉乘判断是否方向一致，若需要可以打开 ===
                 def orientation(p1, p2, p3):
                     return (p2[0] - p1[0]) * (p3[1] - p1[1]) - (p3[0] - p1[0]) * (p2[1] - p1[1])
@@ -180,10 +151,7 @@ def vision_thread():
 
                 angle = signed_angle(point1, point3)
                 mid = midpoint(point2, point3)
-                with data_lock:
-                    vision_data["x"] = mid[0]
-                    vision_data["y"] = mid[1]
-                    vision_data["angle"] = round(angle)
+                print(angle)
 
                 cv2.circle(frame, mid, 5, (255, 0, 255), -1)
                 cv2.putText(frame, f"M({mid[0]},{mid[1]})", (mid[0] + 5, mid[1] - 5),
@@ -200,31 +168,10 @@ def vision_thread():
 
             cv2.imshow("result", frame)
 
+
     cap.release()
     cv2.destroyAllWindows()
 
-
-
-
-# === UDP发送线程 ===
-def udp_sender():
-    while True:
-        with data_lock:
-            packet = {
-                "joystick": joystick_data.copy(),
-                "vision": vision_data.copy()
-            }
-        msg = json.dumps(packet)
-        sock.sendto(msg.encode(), udp_target)
-        print(f"发送数据: {msg}")
-        time.sleep(send_interval)
-
-
-# === 启动线程 ===
-threading.Thread(target=joystick_thread, daemon=True).start()
-threading.Thread(target=vision_thread, daemon=True).start()
-threading.Thread(target=udp_sender, daemon=True).start()
-
-# 主线程保持运行
-while True:
-    time.sleep(1)
+if __name__ == '__main__':
+    udp = udp_utils.UdpClass(('127.0.0.1', 16667),config.esp_address)
+    detect(udp)

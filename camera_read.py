@@ -1,12 +1,13 @@
 import cv2
 
-# 打开默认摄像头（0表示 /dev/video0）
-cap = cv2.VideoCapture(6)
+cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
 
 # 设置摄像头捕获分辨率
+
+cap.set(cv2.CAP_PROP_FPS, 240)
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)  # 设置宽度
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)  # 设置高度
 cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
-# cap.set(cv2.CAP_PROP_FRAME_WIDTH, 3840)  # 设置宽度
-# cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 2160)  # 设置高度
 
 # 检查是否成功打开摄像头
 if not cap.isOpened():

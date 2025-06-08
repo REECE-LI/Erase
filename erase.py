@@ -92,12 +92,20 @@ def detect(udp):
 
         # 二值化
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        ret, binary = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY)
+        ret, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+        # 膨胀 + 腐蚀
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5,5))
+        binary = cv2.dilate(binary, kernel, iterations=1)
+        binary = cv2.erode(binary, kernel, iterations=1)
+
+
+        cv2.imshow("binary", binary)
 
         # 检测边缘
         edges = cv2.Canny(binary, 100, 200)
         # cv2.imshow("edges", edges)
-        #
+
         # 检测轮廓
         contours, hierarchy = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         contours = sorted(contours, key=cv2.contourArea, reverse=True)
@@ -107,7 +115,7 @@ def detect(udp):
             continue
         # cv2.drawContours(blank, contours, -1, (255, 255, 255), 1)
         # cv2.imshow("blank", blank)
-        #
+
 
         for contour in contours:
             print("Contour area:", cv2.contourArea(contour))

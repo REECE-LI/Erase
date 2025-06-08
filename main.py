@@ -1,14 +1,8 @@
-import time
-
 import erase
 import threading
-import queue
 
 import udp_utils  
 import gcode_utils
-import json
-
-import config
 
 import serial
 

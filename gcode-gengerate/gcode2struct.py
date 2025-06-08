@@ -37,7 +37,7 @@ def generate_gcode_for_cpp_structure_from_file(gcode_file):
 
 if __name__ == '__main__':
     # Path to the .gcode file you uploaded
-    gcode_file_path = './gcode/hanzi-jian-edited.gcode'
+    gcode_file_path = '../gcode/hanzi-jian-edited.gcode'
 
     # Generate corresponding GCode_t structures from the G-code file
     gcode_structures = generate_gcode_for_cpp_structure_from_file(gcode_file_path)

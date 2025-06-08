@@ -7,7 +7,7 @@ import re
 import os
 
 
-gcode_path = './gcode/hanzi-jian.gcode'  # 可更改为你加载的任何路径
+gcode_path = '../gcode/hanzi-jian.gcode'  # 可更改为你加载的任何路径
 
 # === GCode_t 结构体类 ===
 class GCode_t:
