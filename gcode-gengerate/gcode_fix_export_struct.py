@@ -5,9 +5,8 @@ import matplotlib.pyplot as plt
 from matplotlib.widgets import Button
 import re
 import os
-
-
-gcode_path = '../gcode/hanzi-jian.gcode'  # 可更改为你加载的任何路径
+from tkinter import Tk
+from tkinter.filedialog import askopenfilename
 
 # === GCode_t 结构体类 ===
 class GCode_t:
@@ -18,7 +17,6 @@ class GCode_t:
 
     def __repr__(self):
         return f"{{{self.x}f, {self.y}f, {str(self.isPen).lower()}}}"
-
 
 # === G-code 解析（识别落笔/抬笔）===
 def parse_gcode(gcode):
@@ -57,7 +55,6 @@ def parse_gcode(gcode):
 
     return coords, path_segments
 
-
 # === 拖动类 ===
 class DraggablePoints:
     def __init__(self, ax, coords, segments):
@@ -74,6 +71,7 @@ class DraggablePoints:
 
         self.points = ax.plot([c['x'] for c in coords], [c['y'] for c in coords], 'o', color='blue')[0]
 
+        # 绑定事件
         self.cid_press = self.points.figure.canvas.mpl_connect('button_press_event', self.on_press)
         self.cid_release = self.points.figure.canvas.mpl_connect('button_release_event', self.on_release)
         self.cid_motion = self.points.figure.canvas.mpl_connect('motion_notify_event', self.on_motion)
@@ -111,6 +109,11 @@ class DraggablePoints:
 
         self.ax.figure.canvas.draw()
 
+    # 清除事件连接
+    def clear_events(self):
+        self.ax.figure.canvas.mpl_disconnect(self.cid_press)
+        self.ax.figure.canvas.mpl_disconnect(self.cid_release)
+        self.ax.figure.canvas.mpl_disconnect(self.cid_motion)
 
 # === 保存并生成结构体 ===
 def save_gcode_and_generate_struct(coords, file_path):
@@ -144,14 +147,24 @@ def save_gcode_and_generate_struct(coords, file_path):
     print(f"\n✅ G-code saved to {file_path}")
 
     # === 输出结构体数组 ===
-    print("\nGCode_t gcodeBuff[] = {")
+    file_name = os.path.splitext(os.path.basename(file_path))[0]  # 获取文件名，不含扩展名
+    print( f"\nconst GCode_t {file_name}[] = {{")
     for c in coords:
         print(f"    {GCode_t(c['x'], c['y'], c['pen'])},")
     print("};\n")
 
 
+# === 选择新 G-code 文件 ===
+def choose_new_gcode_path():
+    Tk().withdraw()  # 不显示主窗口
+    new_gcode_path = askopenfilename(filetypes=[("G-code files", "*.gcode")])  # 选择文件
+    return new_gcode_path if new_gcode_path else gcode_path
+
 # === 主程序 ===
 if __name__ == '__main__':
+    global gcode_path  # 声明为全局变量
+    global dp
+    gcode_path = '../2025-06-08-gcode-78/base_gcode/gcode_1.gcode'  # 初始路径
     base_name = os.path.splitext(os.path.basename(gcode_path))[0]
     save_path = os.path.join(os.path.dirname(gcode_path), base_name + "_fix.gcode")
 
@@ -179,5 +192,40 @@ if __name__ == '__main__':
         save_gcode_and_generate_struct(dp.coords, save_path)
 
     btn_save.on_clicked(on_save)
+
+    # "选择文件"按钮，放置在保存按钮的左边
+    ax_choose = plt.axes([0.55, 0.05, 0.2, 0.075])  # 修改位置
+    btn_choose = Button(ax_choose, 'Choose File')
+
+    def on_choose(event):
+        global gcode_path, save_path  # 使用 global 关键字
+        global dp
+        new_path = choose_new_gcode_path()  # 选择新路径
+        if new_path:  # 如果有选中的文件
+            gcode_path = new_path  # 更新全局变量 gcode_path
+            base_name = os.path.splitext(os.path.basename(gcode_path))[0]  # 更新 base_name
+            save_path = os.path.join(os.path.dirname(gcode_path), base_name + "_fix.gcode")  # 重新计算 save_path
+
+            with open(gcode_path, 'r') as f:
+                gcode_text = f.read()
+            coords, segments = parse_gcode(gcode_text)
+
+            # 清除并更新图形
+            ax.clear()
+            ax.set_title(f"Editable G-code Path ({gcode_path})")
+            ax.set_xlabel("X")
+            ax.set_ylabel("Y")
+            ax.grid(True)
+            ax.set_xlim(min(c['x'] for c in coords) - 5, max(c['x'] for c in coords) + 5)
+            ax.set_ylim(min(c['y'] for c in coords) - 5, max(c['y'] for c in coords) + 5)
+
+            # 清除旧的事件连接
+            dp.clear_events()
+
+            # 重新初始化 DraggablePoints 实例
+            dp = DraggablePoints(ax, coords, segments)
+            plt.draw()
+
+    btn_choose.on_clicked(on_choose)
 
     plt.show()

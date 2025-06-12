@@ -224,13 +224,13 @@ class Slicer:
 
 if __name__ == '__main__':
     s = Slicer(Writer(0x7523, 0x1a86))
-    s.set_font('AlibabaHealthFont20CN-45R.json')#FZSJ-MLXQTJW  AlibabaHealthFont20CN-45R
-    s.set_text("播")#出分,AI监控评分
+    s.set_font('../json/AlibabaHealthFont20CN-45R.json')#FZSJ-MLXQTJW  AlibabaHealthFont20CN-45R
+    s.set_text("大")#出分,AI监控评分
     s.set_width(50)
     s.set_gap(1)#1.1
     s.set_global_location([0, -20])
     output, _ = s.slice()
     print(output)
     # save to txt
-    with open("gcode/hanzi-jian.gcode", "w") as f:
+    with open("../gcode/da.gcode", "w") as f:
         f.writelines(output)
