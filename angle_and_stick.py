@@ -6,6 +6,27 @@ import numpy as np
 import cv2
 import pygame
 import math
+import signal
+import sys
+from collections import deque
+
+
+WINDOW_SIZE = 20
+x_buf     = deque(maxlen=WINDOW_SIZE)
+y_buf     = deque(maxlen=WINDOW_SIZE)
+ang_buf   = deque(maxlen=WINDOW_SIZE)
+
+
+# === 全局退出事件 ===
+stop_event = threading.Event()
+
+def handle_exit(signum, frame):
+    print(f"收到退出信号 {signum}，准备关闭…")
+    stop_event.set()
+
+# 捕获 Ctrl+C（SIGINT）和 PyCharm 停止按钮（SIGTERM）
+signal.signal(signal.SIGINT, handle_exit)
+signal.signal(signal.SIGTERM, handle_exit)
 
 # === 参数设置 ===
 # 小黄
@@ -17,10 +38,9 @@ send_interval = 0.03  # 30ms
 
 # === 全局共享数据 ===
 joystick_data = {"x": 0, "y": 0, "j": 0, "k": 0}
-vision_data = {"x": 0, "y": 0, "angle": 0.0}
-data_lock = threading.Lock()
-sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
+vision_data   = {"x": 0, "y": 0, "angle": 0.0}
+data_lock     = threading.Lock()
+sock          = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
 def signed_angle(p1, p2):
     """
@@ -29,13 +49,10 @@ def signed_angle(p1, p2):
     dx = p2[0] - p1[0]
     dy = p2[1] - p1[1]
     angle_rad = math.atan2(dy, dx)  # 返回 -π ~ π
-    angle_deg = math.degrees(angle_rad)
-    return angle_deg
-
+    return math.degrees(angle_rad)
 
 def midpoint(p1, p2):
     return ((p1[0] + p2[0]) // 2, (p1[1] + p2[1]) // 2)
-
 
 # === 手柄线程 ===
 def joystick_thread():
@@ -50,84 +67,60 @@ def joystick_thread():
     joystick.init()
     print(f"检测到手柄: {joystick.get_name()}")
 
-    while True:
+    while not stop_event.is_set():
         pygame.event.pump()  # 必须调用来更新 joystick 状态
-
         with data_lock:
-            # 假设：
-            # 轴 0 = 左摇杆 X，对应 joystick_data["x"]
-            # 轴 1 = 左摇杆 Y，对应 joystick_data["y"]
-            # 轴 3 = 右摇杆 X 或扳机，对应 joystick_data["z"]
-            joystick_data["x"] = (int)(joystick.get_axis(0) * 110)
-            joystick_data["y"] = (int)(joystick.get_axis(1) * 110)
-            joystick_data["j"] = (int)(joystick.get_axis(4) + 1)
-            joystick_data["k"] = (int)(joystick.get_axis(5) + 1)
-        # # 输出当前手柄状态
-        # print(f"手柄状态: {joystick_data}")
+            joystick_data["x"] = int(joystick.get_axis(0) * 110)
+            joystick_data["y"] = int(joystick.get_axis(1) * 110)
+            joystick_data["j"] = int(joystick.get_axis(4) + 1)
+            joystick_data["k"] = int(joystick.get_axis(5) + 1)
         time.sleep(0.01)  # 防止占用过高 CPU
-
 
 # === 图像识别线程 ===
 def vision_thread():
     cap = cv2.VideoCapture(video_index, cv2.CAP_DSHOW)
-
-    cap.set(cv2.CAP_PROP_FPS, 240)
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+    cap.set(cv2.CAP_PROP_FPS, 180)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1024)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 768)
     cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
 
     lasttime = time.time()
-    fps = 0
     frame_num = 0
 
-    while True:
-        # if error_flag:
+    while not stop_event.is_set():
+        # 如果按下 'q' 也退出
         if cv2.waitKey(1) & 0xFF == ord('q'):
+            stop_event.set()
             break
-        # 获取帧
+
         ret, frame = cap.read()
         if not ret:
             continue
 
-        frame_num = frame_num + 1
-        if frame_num > 100:
+        frame_num += 1
+        if frame_num >= 100:
             now = time.time()
             fps = 100 / (now - lasttime)
             lasttime = now
             frame_num = 0
+            # print(f"FPS: {fps:.1f}")
 
-        frame = cv2.resize(frame, ((int)(960), (int)(540)), interpolation=cv2.INTER_LINEAR)
-        # cv2.imshow("frame", frame)
-
-        blank = np.zeros_like(frame)
-
-        # 二值化
+        frame = cv2.resize(frame, (960, 540), interpolation=cv2.INTER_LINEAR)
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        ret, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-
+        _, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
         binary = cv2.bitwise_not(binary)
-        # 膨胀 + 腐蚀
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
         binary = cv2.dilate(binary, kernel, iterations=1)
         binary = cv2.bitwise_not(binary)
         binary = cv2.dilate(binary, kernel, iterations=1)
-        # binary = cv2.erode(binary, kernel, iterations=1)
 
-        # 直接在二值图像上找轮廓
         contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-        # # 过滤小轮廓
-        # contours = [c for c in contours if cv2.contourArea(c) > 10]
-
-        # 按面积排序，取最大的三个轮廓
         contours = sorted(contours, key=cv2.contourArea, reverse=True)[:3]
 
         if len(contours) < 3:
-            print("Not enough valid contours found")
-            error_flag = True
+            # print("Not enough valid contours found")
             continue
 
-        # 计算三个轮廓的重心
         centers = []
         for contour in contours:
             M = cv2.moments(contour)
@@ -137,94 +130,93 @@ def vision_thread():
             cy = int(M["m01"] / M["m00"])
             centers.append((cx, cy))
 
-            if len(centers) == 3:
-                # === 找出3号点：距离其他两点之和最大 ===
-                distsums = []
-                for i in range(3):
-                    dist_sum = 0
-                    for j in range(3):
-                        if i != j:
-                            dist_sum += np.linalg.norm(np.array(centers[i]) - np.array(centers[j]))
-                    distsums.append(dist_sum)
-                index3 = np.argmax(distsums)
-                point3 = centers[index3]
+        if len(centers) == 3:
+            # 找出 3 号点：距离其他两点之和最大
+            distsums = [sum(np.linalg.norm(np.array(centers[i]) - np.array(centers[j]))
+                            for j in range(3) if i != j) for i in range(3)]
+            idx3 = int(np.argmax(distsums))
+            p3 = centers[idx3]
+            rem = [i for i in range(3) if i != idx3]
+            pA, pB = centers[rem[0]], centers[rem[1]]
 
-                # === 剩下两个点 ===
-                remaining_indices = [i for i in range(3) if i != index3]
-                ptA = centers[remaining_indices[0]]
-                ptB = centers[remaining_indices[1]]
+            # 初始：最长边为 1 号
+            if np.linalg.norm(np.array(pA)-np.array(p3)) > np.linalg.norm(np.array(pB)-np.array(p3)):
+                p1, p2 = pA, pB
+            else:
+                p1, p2 = pB, pA
 
-                # === 通过边长判断哪个是1号（但我们稍后要交换） ===
-                len_A3 = np.linalg.norm(np.array(ptA) - np.array(point3))
-                len_B3 = np.linalg.norm(np.array(ptB) - np.array(point3))
+            # 令 (p1,p2,p3) 顺时针
+            def orientation(a,b,c):
+                return (b[0]-a[0])*(c[1]-a[1]) - (c[0]-a[0])*(b[1]-a[1])
 
-                # 初始：最长边对角是1号，另一个是2号
-                if len_A3 > len_B3:
-                    point1 = ptA
-                    point2 = ptB
-                else:
-                    point1 = ptB
-                    point2 = ptA
+            if orientation(p1, p2, p3) < 0:
+                p1, p2 = p2, p1
 
-                # === 交换 1号 和 2号顺序 ===
+            p1, p2 = p2, p1
+            # 计算角度和中点
+            angle = signed_angle(p1, p3)
+            mid = midpoint(p2, p3)
+            raw_x = mid[0] / 0.4
+            raw_y = mid[1] / 0.4
+            raw_ang = angle
 
-                # === 可选：叉乘判断是否方向一致，若需要可以打开 ===
-                def orientation(p1, p2, p3):
-                    return (p2[0] - p1[0]) * (p3[1] - p1[1]) - (p3[0] - p1[0]) * (p2[1] - p1[1])
+            # 更新 buffers
+            x_buf.append(raw_x)
+            y_buf.append(raw_y)
+            ang_buf.append(raw_ang)
 
-                # 如果方向不对（逆时针），交换1、2号使其统一为顺时针
-                if orientation(point1, point2, point3) < 0:
-                    point1, point2 = point2, point1
+            # 计算平均值
+            filt_x = sum(x_buf) / len(x_buf)
+            filt_y = sum(y_buf) / len(y_buf)
+            filt_ang = sum(ang_buf) / len(ang_buf)
 
-                point1, point2 = point2, point1
+            with data_lock:
+                vision_data["x"] = int(filt_x)
+                vision_data["y"] = int(filt_y)
+                vision_data["angle"] = round(filt_ang)
 
-                angle = signed_angle(point1, point3)
-                mid = midpoint(point2, point3)
-                with data_lock:
-                    vision_data["x"] = mid[0]
-                    vision_data["y"] = mid[1]
-                    vision_data["angle"] = round(angle)
+            # 可视化
+            cv2.circle(frame, mid, 5, (255, 0, 255), -1)
+            cv2.putText(frame, f"M({mid[0]},{mid[1]})", (mid[0]+5, mid[1]-5),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 0, 255), 1)
+            for idx, pt in enumerate([p1, p2, p3], start=1):
+                cv2.putText(frame, f"{idx}", (pt[0]-10, pt[1]-10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
 
-                cv2.circle(frame, mid, 5, (255, 0, 255), -1)
-                cv2.putText(frame, f"M({mid[0]},{mid[1]})", (mid[0] + 5, mid[1] - 5),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 0, 255), 1)
+        cv2.imshow("result", frame)
 
-                # === 显示编号在图上 ===
-                for i, pt in enumerate([point1, point2, point3], start=1):
-                    cv2.putText(frame, f"{i}", (pt[0] - 10, pt[1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255),
-                                2)
-
-            # 可视化重心
-            cv2.circle(frame, (cx, cy), 5, (0, 255, 0), -1)
-            cv2.putText(frame, f"({cx},{cy})", (cx + 5, cy - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 0, 0), 1)
-
-            cv2.imshow("result", frame)
-
+    # 清理摄像头资源
     cap.release()
-    cv2.destroyAllWindows()
-
-
-
 
 # === UDP发送线程 ===
 def udp_sender():
-    while True:
+    while not stop_event.is_set():
         with data_lock:
             packet = {
                 "joystick": joystick_data.copy(),
-                "vision": vision_data.copy()
+                "vision":  vision_data.copy()
             }
-        msg = json.dumps(packet)
-        sock.sendto(msg.encode(), udp_target)
-        print(f"发送数据: {msg}")
+        sock.sendto(json.dumps(packet).encode(), udp_target)
+        print(f"发送数据: {packet}")
         time.sleep(send_interval)
+    sock.close()
 
+# 启动线程
+threads = [
+    threading.Thread(target=joystick_thread),
+    threading.Thread(target=vision_thread),
+    threading.Thread(target=udp_sender),
+]
+for t in threads:
+    t.start()
 
-# === 启动线程 ===
-threading.Thread(target=joystick_thread, daemon=True).start()
-threading.Thread(target=vision_thread, daemon=True).start()
-threading.Thread(target=udp_sender, daemon=True).start()
-
-# 主线程保持运行
-while True:
-    time.sleep(1)
+# 主线程等待退出事件并统一清理
+try:
+    while not stop_event.is_set():
+        time.sleep(0.5)
+except KeyboardInterrupt:
+    stop_event.set()
+finally:
+    print("清理 OpenCV 窗口并退出")
+    cv2.destroyAllWindows()
+    sys.exit(0)

@@ -164,7 +164,7 @@ def choose_new_gcode_path():
 if __name__ == '__main__':
     global gcode_path  # 声明为全局变量
     global dp
-    gcode_path = '../2025-06-08-gcode-78/base_gcode/gcode_1.gcode'  # 初始路径
+    gcode_path = '../2025-06-08-gcode-78/big_gcode/gcode_1.gcode'  # 初始路径
     base_name = os.path.splitext(os.path.basename(gcode_path))[0]
     save_path = os.path.join(os.path.dirname(gcode_path), base_name + "_fix.gcode")
 

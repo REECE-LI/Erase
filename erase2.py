@@ -25,9 +25,9 @@ cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
 # cap = cv2.VideoCapture(4)
 # set 240 fps
 
-cap.set(cv2.CAP_PROP_FPS, 240)
-cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640) #640
-cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480) #400
+cap.set(cv2.CAP_PROP_FPS, 180)
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, 800) #640
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 600) #400
 cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
 
 def signed_angle(p1, p2):
