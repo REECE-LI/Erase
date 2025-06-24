@@ -178,7 +178,7 @@ class Slicer:
 
             # Save the G-code for the current character to a separate file
             file_name = f"gcode_{num}.gcode"  # 使用拼音作为文件名的一部分
-            output_path = os.path.join("../2025-06-08-gcode-78/big_gcode", file_name)  # 确保目录存在
+            output_path = os.path.join("../2025-06-08-gcode-78/121+", file_name)  # 确保目录存在
             # output_path = os.path.join("../2025-06-08-gcode-78/base_gcode", file_name)  # 确保目录存在
             num = num + 1
             # Make sure the "gcode" folder exists
@@ -212,8 +212,8 @@ if __name__ == '__main__':
     text = ''.join(characters)
     s.set_text(text)
 
+    # s.set_width(65)
     s.set_width(65)
-    # s.set_width(50)
     s.set_gap(1)
     s.set_global_location([0, -20])
 

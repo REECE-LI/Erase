@@ -33,7 +33,7 @@ else:
     alpha_ov = None
 
 # ———— 2. 打开摄像头并设置 MJPG + 高分辨率 ————
-cap = cv2.VideoCapture(1, cv2.CAP_DSHOW)
+cap = cv2.VideoCapture(2, cv2.CAP_DSHOW)
 if not cap.isOpened():
     print("⚠️ 无法打开摄像头")
     exit(1)
