@@ -71,7 +71,7 @@ def save_and_print_struct(coords, orig_path):
     # print(f"✅ Saved fixed G-code to: {fix_path}")
 
     # —— 输出 C++ 数组 ——
-    struct_name = f"{base}_big"
+    struct_name = f"{base}_hello"
     print(f"\nconst GCode_t {struct_name}[] = {{")
     for c in coords:
         print(f"    {GCode_t(c['x'], c['y'], c['pen'])},")
@@ -80,8 +80,8 @@ def save_and_print_struct(coords, orig_path):
 
 if __name__ == '__main__':
     # 假设所有 gcode 文件都在同一目录下，路径根据需要修改
-    gcode_dir = '../2025-06-08-gcode-78/big_gcode'
-    for i in range(1, 26):
+    gcode_dir = '../2025-06-08-gcode-78/helloworld_gcode'
+    for i in range(1, 8):
         src = os.path.join(gcode_dir, f"gcode_{i}.gcode")
         if not os.path.isfile(src):
             print(f"⚠️  File not found: {src}")

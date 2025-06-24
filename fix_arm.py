@@ -146,5 +146,5 @@ def find_and_sort_black_spots(input_path):
 
 
 # 使用示例
-input_image = './20250607-193825.jpg'  # 输入图片路径
+input_image = ('./picture/20250616-155647.jpg')  # 输入图片路径
 find_and_sort_black_spots(input_image)

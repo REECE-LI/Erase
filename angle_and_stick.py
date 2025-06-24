@@ -30,14 +30,14 @@ signal.signal(signal.SIGTERM, handle_exit)
 
 # === 参数设置 ===
 # 小黄
-# udp_target = ('192.168.50.17', 11222)
+udp_target = ('192.168.50.17', 11222)
 # 小绿
-udp_target = ('192.168.50.166', 11222)
+# udp_target = ('192.168.50.166', 11222)
 video_index = 0
 send_interval = 0.03  # 30ms
 
 # === 全局共享数据 ===
-joystick_data = {"x": 0, "y": 0, "j": 0, "k": 0}
+joystick_data = {"x": 0, "y": 0, "j": 0, "k": 0, "z":0}
 vision_data   = {"x": 0, "y": 0, "angle": 0.0}
 data_lock     = threading.Lock()
 sock          = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -74,6 +74,7 @@ def joystick_thread():
             joystick_data["y"] = int(joystick.get_axis(1) * 110)
             joystick_data["j"] = int(joystick.get_axis(4) + 1)
             joystick_data["k"] = int(joystick.get_axis(5) + 1)
+            joystick_data["z"] = int(joystick.get_button(8))
         time.sleep(0.01)  # 防止占用过高 CPU
 
 # === 图像识别线程 ===
