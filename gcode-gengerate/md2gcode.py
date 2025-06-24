@@ -213,7 +213,7 @@ if __name__ == '__main__':
     s.set_text(text)
 
     # s.set_width(65)
-    s.set_width(65)
+    s.set_width(50)
     s.set_gap(1)
     s.set_global_location([0, -20])
 

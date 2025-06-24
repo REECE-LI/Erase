@@ -81,7 +81,7 @@ def save_and_print_struct(coords, orig_path):
 if __name__ == '__main__':
     # 假设所有 gcode 文件都在同一目录下，路径根据需要修改
     gcode_dir = '../2025-06-08-gcode-78/121+'
-    for i in range(143, 147):
+    for i in range(168, 170):
         src = os.path.join(gcode_dir, f"gcode_{i}.gcode")
         if not os.path.isfile(src):
             print(f"⚠️  File not found: {src}")
